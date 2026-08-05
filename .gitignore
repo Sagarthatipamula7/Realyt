@@ -1,0 +1,36 @@
+# Environment files — never commit real credentials
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+backend-run.log
+backend-run.err.log
+frontend-run.log
+frontend-run.err.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/
+package-lock.json
+
+# Java build
+realyt-backend/target/
+
+# Frontend build output
+realyt-frontend/dist/
+
+# Backup files
+*.bak
+*.orig
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/

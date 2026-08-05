@@ -1,0 +1,21 @@
+# Maven
+/target
+/.mvn
+!/.mvn/wrapper/maven-wrapper.jar
+
+# Environment — never commit real credentials
+.env
+.env.local
+
+# Logs
+*.log
+
+# IDE
+/.idea
+*.iml
+*.ipr
+*.iws
+
+# System files
+.DS_Store
+Thumbs.db

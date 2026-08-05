@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+MAVEN_VERSION=3.9.5
+ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
+MAVEN_DIR="$ROOT_DIR/.mvn/wrapper/apache-maven-$MAVEN_VERSION"
+if [ ! -x "$MAVEN_DIR/bin/mvn" ]; then
+  echo "Downloading Apache Maven $MAVEN_VERSION..."
+  mkdir -p "$ROOT_DIR/.mvn/wrapper"
+  tmpfile="$(mktemp -t mvnXXXXXX.zip)"
+  curl -L -o "$tmpfile" "https://archive.apache.org/dist/maven/maven-3/3.9.5/binaries/apache-maven-3.9.5-bin.zip"
+  unzip -o "$tmpfile" -d "$ROOT_DIR/.mvn/wrapper"
+  rm -f "$tmpfile"
+fi
+exec "$MAVEN_DIR/bin/mvn" "$@"
