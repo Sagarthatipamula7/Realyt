@@ -12,8 +12,8 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-export function signupRequest(email, password, name = null) {
-  return api.post('/auth/signup', { email, password, name }).then((response) => response.data);
+export function signupRequest(email, password, name = null, role = 'CLIENT') {
+  return api.post('/auth/signup', { email, password, name, role }).then((response) => response.data);
 }
 
 export function loginRequest(email, password) {

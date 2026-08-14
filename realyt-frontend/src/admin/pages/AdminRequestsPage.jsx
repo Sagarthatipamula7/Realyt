@@ -9,7 +9,7 @@ import {
   assignEditorToOrder,
   updateEditorApplicationStatus
 } from '../api/adminApi.js';
-import { Search, Filter, UserPlus, Inbox, CheckCircle2 } from 'lucide-react';
+import { Search, Filter, UserPlus, UserCheck, Inbox, CheckCircle2 } from 'lucide-react';
 
 export default function AdminRequestsPage() {
   const [activeTab, setActiveTab] = useState('customer'); // 'customer' | 'editor'
@@ -165,15 +165,64 @@ export default function AdminRequestsPage() {
                         {statusStr}
                       </span>
                     </td>
-                    <td>{req.editorName || (req.editor ? req.editor.fullName : <span className="text-dim">Unassigned</span>)}</td>
+                    <td>
+                      {req.editor || req.editorName ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{
+                            width: '28px', height: '28px', borderRadius: '50%',
+                            background: 'rgba(52, 211, 153, 0.2)', border: '1px solid rgba(52, 211, 153, 0.4)',
+                            color: '#34D399', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontWeight: 700, fontSize: '0.78rem'
+                          }}>
+                            🎬
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 700, color: '#34D399', fontSize: '0.88rem' }}>
+                              {req.editor ? req.editor.fullName : (req.editorName || 'Assigned Editor')}
+                            </div>
+                            <div style={{ fontSize: '0.72rem', color: '#94A3B8' }}>
+                              {req.editor?.email || 'Assigned'}
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <span style={{
+                          fontSize: '0.78rem', fontWeight: 600, color: '#FCD34D',
+                          background: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245, 158, 11, 0.3)',
+                          padding: '4px 10px', borderRadius: '8px', display: 'inline-flex', alignItems: 'center', gap: '4px'
+                        }}>
+                          ⚠️ Unassigned
+                        </span>
+                      )}
+                    </td>
                     <td onClick={(e) => e.stopPropagation()}>
-                      <button
-                        type="button"
-                        className="btn btn-primary btn-sm"
-                        onClick={() => setAssigningOrder(req)}
-                      >
-                        Assign Editor
-                      </button>
+                      {req.editor || req.editorName ? (
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          style={{
+                            border: '1px solid rgba(96, 165, 250, 0.4)',
+                            color: '#60A5FA',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            fontSize: '0.82rem',
+                            padding: '6px 12px'
+                          }}
+                          onClick={() => setAssigningOrder(req)}
+                        >
+                          <UserCheck size={14} /> Reassign Editor
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn btn-primary btn-sm"
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}
+                          onClick={() => setAssigningOrder(req)}
+                        >
+                          <UserCheck size={14} /> Assign Editor
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );

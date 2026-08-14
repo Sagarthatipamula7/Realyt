@@ -132,3 +132,26 @@ src/
 5. Order creation + tracking
 6. Admin assignment + masked messaging
 7. Stripe Connect integration
+
+------------------------------------------------------------------------
+# Step 1: Navigate into the frontend folder
+cd realyt-frontend
+
+# Step 2: Install all dependencies (Required first time only)
+npm install
+
+# Step 3: Start the frontend development server
+npm run dev
+
+------------------------------------------------------------------------
+
+# Step 1: Navigate into the backend folder
+cd realyt-backend
+
+# Step 2: Build the project and download Java dependencies
+.\mvnw.cmd clean install
+
+# Step 3: Run the backend server
+.\mvnw.cmd spring-boot:run
+
+------------------------------------------------------------------------

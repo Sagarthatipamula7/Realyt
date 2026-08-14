@@ -49,17 +49,17 @@ export default function AssignEditorModal({ order, onClose, onAssignConfirmed })
             </div>
           </div>
 
-          <label className="modal-label" style={{ fontWeight: 600, display: 'block', marginBottom: '8px' }}>Select Available Editor:</label>
+          <label className="modal-label" style={{ fontWeight: 600, display: 'block', marginBottom: '8px', color: '#FCD34D' }}>Select Available Editor from Roster:</label>
           <select
             className="admin-select"
-            style={{ width: '100%', marginBottom: '14px' }}
+            style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', background: '#111C31', color: '#FFF', border: '1px solid rgba(245, 158, 11, 0.4)', fontSize: '0.92rem', marginBottom: '18px', outline: 'none', cursor: 'pointer' }}
             value={selectedEditorId}
             onChange={(e) => setSelectedEditorId(e.target.value)}
           >
             <option value="">-- Choose an Available Editor --</option>
             {editors.map((ed) => (
               <option key={ed.id} value={ed.id}>
-                {ed.name || ed.fullName} ({ed.rating || '5.0'} ★) — {ed.status || 'Available'}
+                {ed.name || ed.fullName} ({ed.email || 'Registered'}) — {ed.rating || '5.0 ⭐'}
               </option>
             ))}
           </select>

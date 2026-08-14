@@ -5,6 +5,7 @@ import com.realyt.backend.model.Order;
 import com.realyt.backend.model.OrderStatus;
 import com.realyt.backend.model.ReelPricing;
 import com.realyt.backend.model.UserAccount;
+import com.realyt.backend.model.UserRole;
 import com.realyt.backend.repository.NotificationRepository;
 import com.realyt.backend.repository.OrderRepository;
 import com.realyt.backend.repository.ReelPricingRepository;
@@ -52,6 +53,65 @@ public class ClientOrderController {
     @GetMapping
     public ResponseEntity<List<Order>> getAllOrders() {
         return ResponseEntity.ok(orderRepository.findAllByOrderByCreatedAtDesc());
+    }
+
+    @GetMapping("/editor/assignments")
+    public ResponseEntity<List<Order>> getEditorAssignments(@RequestParam(required = false) String email) {
+        List<Order> all = orderRepository.findAllByOrderByCreatedAtDesc();
+        if (email != null && !email.isBlank()) {
+            String target = email.trim().toLowerCase();
+            List<Order> filtered = all.stream()
+                    .filter(o -> o.getEditor() != null && (target.equalsIgnoreCase(o.getEditor().getEmail()) || (o.getEditor().getFullName() != null && o.getEditor().getFullName().toLowerCase().contains(target))))
+                    .toList();
+            return ResponseEntity.ok(filtered);
+        }
+        List<Order> assigned = all.stream().filter(o -> o.getEditor() != null).toList();
+        return ResponseEntity.ok(assigned);
+    }
+
+    @GetMapping("/editors-list")
+    public ResponseEntity<List<Map<String, Object>>> getEditorsList() {
+        List<UserAccount> editors = userAccountRepository.findAll().stream()
+                .filter(u -> u.getRole() == UserRole.EDITOR)
+                .toList();
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (UserAccount ed : editors) {
+            Map<String, Object> map = new HashMap<>();
+            map.put("id", ed.getId());
+            map.put("name", ed.getFullName() + " (" + ed.getEmail() + ")");
+            map.put("fullName", ed.getFullName());
+            map.put("email", ed.getEmail());
+            map.put("status", "Active & Available");
+            map.put("rating", "4.9");
+            result.add(map);
+        }
+        return ResponseEntity.ok(result);
+    }
+
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<Order> updateOrderStatus(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        Optional<Order> orderOpt = orderRepository.findById(id);
+        if (orderOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        Order order = orderOpt.get();
+        if (body != null && body.containsKey("status")) {
+            String newStatusStr = body.get("status").toUpperCase();
+            try {
+                OrderStatus newStatus = OrderStatus.valueOf(newStatusStr);
+                order.setStatus(newStatus);
+            } catch (Exception e) {
+                if ("COMPLETED".equalsIgnoreCase(newStatusStr) || "DELIVERED".equalsIgnoreCase(newStatusStr)) {
+                    order.setStatus(OrderStatus.COMPLETED);
+                } else if ("IN_PROGRESS".equalsIgnoreCase(newStatusStr)) {
+                    order.setStatus(OrderStatus.IN_PROGRESS);
+                }
+            }
+            orderRepository.save(order);
+            logger.info("Order #{} status updated to {} in PostgreSQL database.", order.getId(), order.getStatus());
+        }
+        return ResponseEntity.ok(order);
     }
 
     @PostMapping

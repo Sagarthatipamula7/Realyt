@@ -101,15 +101,24 @@ public class AuthService {
             ? request.getName()
             : (request.getFullName() != null && !request.getFullName().isBlank() ? request.getFullName() : email.split("@")[0]);
         user.setFullName(displayName);
-        user.setRole(UserRole.CLIENT);
+        
+        UserRole targetRole = UserRole.CLIENT;
+        if (request.getRole() != null && !request.getRole().isBlank()) {
+            try {
+                targetRole = UserRole.valueOf(request.getRole().trim().toUpperCase());
+            } catch (Exception ignored) {
+                targetRole = UserRole.CLIENT;
+            }
+        }
+        user.setRole(targetRole);
         user.setActive(true);
 
         UserAccount savedUser = userAccountRepository.save(user);
-        logger.info("User created successfully with ID: {}, email: {}, passwordHash length: {}", 
-                savedUser.getId(), savedUser.getEmail(), savedUser.getPasswordHash().length());
+        logger.info("User created successfully with ID: {}, email: {}, role: {}", 
+                savedUser.getId(), savedUser.getEmail(), savedUser.getRole());
 
         String token = jwtService.generateToken(savedUser.getEmail());
-        return new AuthResponse(token, email, UserRole.CLIENT.name(),
+        return new AuthResponse(token, email, savedUser.getRole().name(),
                 "Account created successfully. You are now logged in.");
     }
 

@@ -12,6 +12,7 @@ public class AuthRequest {
 
     private String name;
     private String fullName;
+    private String role;
 
     public String getEmail() {
         return email;
@@ -43,5 +44,13 @@ public class AuthRequest {
 
     public void setFullName(String fullName) {
         this.fullName = fullName;
+    }
+
+    public String getRole() {
+        return role;
+    }
+
+    public void setRole(String role) {
+        this.role = role;
     }
 }

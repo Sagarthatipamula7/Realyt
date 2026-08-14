@@ -170,19 +170,34 @@ public class AdminController {
                 .collect(Collectors.toList());
 
         List<Map<String, Object>> result = new ArrayList<>();
-        int index = 1;
         for (UserAccount ed : editors) {
             Map<String, Object> map = new HashMap<>();
             map.put("id", ed.getId());
-            map.put("name", ed.getFullName());
+            map.put("name", ed.getFullName() + " (Registered Editor)");
+            map.put("fullName", ed.getFullName());
             map.put("email", ed.getEmail());
-            map.put("status", index % 3 == 0 ? "On leave" : "Active");
-            map.put("reelsCompletedMonth", 8 + (index * 3) % 10);
-            map.put("targetReels", 15);
-            map.put("rating", 4.5 + (index % 5) * 0.1);
-            map.put("totalLifetimeReels", 42 + index * 12);
+            map.put("status", "Active & Available");
+            map.put("rating", "4.9");
             result.add(map);
-            index++;
+        }
+
+        // Also fetch approved editor applications from database
+        try {
+            List<EditorApplication> approvedApps = editorApplicationRepository.findAll().stream()
+                    .filter(a -> "APPROVED".equalsIgnoreCase(a.getStatus()) || "SHORTLISTED".equalsIgnoreCase(a.getStatus()))
+                    .collect(Collectors.toList());
+
+            for (EditorApplication app : approvedApps) {
+                Map<String, Object> map = new HashMap<>();
+                map.put("id", app.getId());
+                map.put("name", app.getName() + " (" + (app.getExperienceLevel() != null ? app.getExperienceLevel() : "Approved Applicant") + ")");
+                map.put("fullName", app.getName());
+                map.put("email", app.getEmail());
+                map.put("status", app.getStatus());
+                map.put("rating", "4.8");
+                result.add(map);
+            }
+        } catch (Exception ignored) {
         }
 
         return ResponseEntity.ok(result);

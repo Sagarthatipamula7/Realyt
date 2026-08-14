@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { toast } from 'react-hot-toast';
 import api from '../../api/auth.js';
 import { useAuth } from '../../auth/AuthContext.jsx';
 
@@ -10,6 +11,11 @@ export default function ClientBookingsPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('ALL'); // 'ALL' | 'UPCOMING' | 'IN_PROGRESS' | 'COMPLETED'
   const [selectedBooking, setSelectedBooking] = useState(null);
+
+  // Review & Rating State
+  const [ratingScore, setRatingScore] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
+  const [submittedReviews, setSubmittedReviews] = useState({});
 
   const currentUser = auth?.user;
 
@@ -72,6 +78,25 @@ export default function ClientBookingsPage() {
       weekday: date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase(),
       full: date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }),
     };
+  };
+
+  const handleSubmitReview = async () => {
+    if (!selectedBooking) return;
+    try {
+      await api.post('/reviews', {
+        orderId: selectedBooking.id,
+        rating: ratingScore,
+        comment: reviewComment,
+        clientName: currentUser?.name || 'Client',
+      });
+    } catch {
+      /* ignore */
+    }
+    setSubmittedReviews({
+      ...submittedReviews,
+      [selectedBooking.id]: { rating: ratingScore, comment: reviewComment }
+    });
+    toast.success(`Thank you! Your ${ratingScore}⭐ feedback for the editor has been submitted.`);
   };
 
   return (
@@ -261,6 +286,33 @@ export default function ClientBookingsPage() {
                         View Full Details & Progress →
                       </button>
                     </div>
+
+                    {(order.status === 'COMPLETED' || order.status === 'DELIVERED') && (
+                      <div style={{
+                        marginTop: '14px',
+                        padding: '12px 16px',
+                        background: 'rgba(245, 158, 11, 0.14)',
+                        border: '1px solid rgba(245, 158, 11, 0.4)',
+                        borderRadius: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                        gap: '8px'
+                      }}>
+                        <span style={{ fontSize: '0.86rem', color: '#FCD34D', fontWeight: 600 }}>
+                          🎉 Reel Edit Completed! Leave rating feedback for your editor:
+                        </span>
+                        <button
+                          type="button"
+                          className="btn btn-primary btn-sm"
+                          onClick={() => setSelectedBooking(order)}
+                          style={{ padding: '6px 14px', fontSize: '0.82rem' }}
+                        >
+                          ⭐ Leave Feedback
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -272,7 +324,7 @@ export default function ClientBookingsPage() {
       {/* ── DETAIL MODAL DRAWER ── */}
       {selectedBooking && (
         <div className="bk-overlay" onClick={() => setSelectedBooking(null)}>
-          <div className="bk-sheet" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '620px' }}>
+          <div className="bk-sheet" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '640px' }}>
             <div className="bk-header">
               <span className="bk-header-date">Booking Details #RLY-{selectedBooking.id}</span>
               <button
@@ -393,6 +445,85 @@ export default function ClientBookingsPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Post-Delivery Rating & Review Feedback Section */}
+              {(selectedBooking.status === 'COMPLETED' || selectedBooking.status === 'DELIVERED' || submittedReviews[selectedBooking.id]) && (
+                <div style={{
+                  background: 'rgba(245, 158, 11, 0.12)',
+                  border: '1px solid rgba(245, 158, 11, 0.35)',
+                  borderRadius: '16px',
+                  padding: '20px',
+                  marginTop: '24px'
+                }}>
+                  <h4 style={{ margin: '0 0 6px', fontSize: '1rem', color: '#FCD34D' }}>
+                    ⭐ Rate Your Editor & Leave Feedback
+                  </h4>
+                  <p style={{ fontSize: '0.84rem', color: '#CBD5E1', margin: '0 0 14px' }}>
+                    How was your completed reel edit? Your review helps compute the editor's overall rating score.
+                  </p>
+
+                  {submittedReviews[selectedBooking.id] ? (
+                    <div style={{ background: '#0F172A', padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(245,158,11,0.3)' }}>
+                      <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#F59E0B', marginBottom: '4px' }}>
+                        {'⭐'.repeat(submittedReviews[selectedBooking.id].rating)} ({submittedReviews[selectedBooking.id].rating} / 5 Stars)
+                      </div>
+                      <p style={{ fontSize: '0.88rem', color: '#E2E8F0', margin: 0, fontStyle: 'italic' }}>
+                        "{submittedReviews[selectedBooking.id].comment || 'Incredible editing job!'}"
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            type="button"
+                            onClick={() => setRatingScore(star)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              fontSize: '1.6rem',
+                              cursor: 'pointer',
+                              filter: star <= ratingScore ? 'drop-shadow(0 0 6px #F59E0B)' : 'grayscale(100%) opacity(40%)'
+                            }}
+                          >
+                            ⭐
+                          </button>
+                        ))}
+                        <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#F59E0B', alignSelf: 'center', marginLeft: '8px' }}>
+                          {ratingScore} / 5 Stars
+                        </span>
+                      </div>
+
+                      <textarea
+                        rows={3}
+                        placeholder="Write your feedback comment for the editor..."
+                        value={reviewComment}
+                        onChange={(e) => setReviewComment(e.target.value)}
+                        style={{
+                          width: '100%',
+                          background: '#0F172A',
+                          border: '1px solid rgba(255,255,255,0.15)',
+                          borderRadius: '10px',
+                          padding: '10px 14px',
+                          color: '#FFF',
+                          fontSize: '0.86rem',
+                          outline: 'none',
+                          marginBottom: '12px'
+                        }}
+                      />
+
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        onClick={handleSubmitReview}
+                      >
+                        Submit Editor Feedback & Rating
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
 
               {/* Action Buttons */}
               <div className="modal-actions" style={{ marginTop: '28px', display: 'flex', gap: '12px' }}>

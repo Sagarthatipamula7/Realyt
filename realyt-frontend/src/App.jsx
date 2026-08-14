@@ -4,6 +4,12 @@ import { AuthProvider } from './auth/AuthContext.jsx';
 import HomePage from './pages/client/HomePage.jsx';
 import ClientBookingsPage from './pages/client/ClientBookingsPage.jsx';
 
+import EditorLayout from './pages/editor/components/EditorLayout.jsx';
+import EditorDashboardPage from './pages/editor/EditorDashboardPage.jsx';
+import EditorAssignmentsPage from './pages/editor/EditorAssignmentsPage.jsx';
+import EditorAnalyticsPage from './pages/editor/EditorAnalyticsPage.jsx';
+import EditorSettingsPage from './pages/editor/EditorSettingsPage.jsx';
+
 import AdminLoginPage from './admin/pages/AdminLoginPage.jsx';
 import AdminProtectedRoute from './admin/components/AdminProtectedRoute.jsx';
 import AdminLayout from './admin/pages/AdminLayout.jsx';
@@ -17,12 +23,23 @@ import AdminSettingsPage from './admin/pages/AdminSettingsPage.jsx';
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
           {/* Public Home & Client Bookings */}
           <Route path="/" element={<HomePage />} />
           <Route path="/my-bookings" element={<ClientBookingsPage />} />
           <Route path="/bookings" element={<ClientBookingsPage />} />
+
+          {/* Editor Portal Domain with Left Sidebar Layout */}
+          <Route path="/editor" element={<EditorLayout />}>
+            <Route index element={<Navigate to="dashboard" replace />} />
+            <Route path="dashboard" element={<EditorDashboardPage />} />
+            <Route path="clients" element={<EditorAssignmentsPage />} />
+            <Route path="assignments" element={<EditorAssignmentsPage />} />
+            <Route path="analytics" element={<EditorAnalyticsPage />} />
+            <Route path="settings" element={<EditorSettingsPage />} />
+          </Route>
+          <Route path="/my-assignments" element={<Navigate to="/editor/clients" replace />} />
 
           {/* Secure Admin Login */}
           <Route path="/admin/login" element={<AdminLoginPage />} />

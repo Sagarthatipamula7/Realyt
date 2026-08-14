@@ -124,6 +124,7 @@ export default function HomePage() {
   const [authView, setAuthView] = useState('login'); // 'login' | 'signup' | 'forgot'
   const [authStage, setAuthStage] = useState('form'); // 'form' | 'done'
   const [authLaunch, setAuthLaunch] = useState('nav'); // 'nav' | 'booking'
+  const [authRole, setAuthRole] = useState('CLIENT'); // 'CLIENT' | 'EDITOR'
   const [editorModalOpen, setEditorModalOpen] = useState(false);
   const [copiedText, setCopiedText] = useState('');
   const [editorForm, setEditorForm] = useState({
@@ -149,10 +150,54 @@ export default function HomePage() {
   const [authMessage, setAuthMessage] = useState('');
   const currentUser = auth?.user;
   const setCurrentUser = (u) => auth?.setUser(u);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [profileForm, setProfileForm] = useState({ name: '', email: '', phone: '', address: '' });
+  const [profileSavedSuccess, setProfileSavedSuccess] = useState(false);
+
+  const openProfileModal = () => {
+    const u = auth?.user || currentUser || {};
+    setProfileForm({
+      name: u.name || `${u.firstName || ''} ${u.lastName || ''}`.trim() || '',
+      email: u.email || '',
+      phone: u.mobile || u.phone || '',
+      address: u.address || u.city || u.venue || '',
+    });
+    setProfileSavedSuccess(false);
+    setProfileModalOpen(true);
+  };
+
+  const handleSaveProfile = (e) => {
+    e.preventDefault();
+    const u = auth?.user || currentUser || {};
+    const nameParts = profileForm.name.trim().split(' ');
+    const firstName = nameParts[0] || 'User';
+    const lastName = nameParts.slice(1).join(' ') || '';
+    const updatedUser = {
+      ...u,
+      name: profileForm.name.trim(),
+      firstName,
+      lastName,
+      mobile: profileForm.phone.trim(),
+      phone: profileForm.phone.trim(),
+      address: profileForm.address.trim(),
+      city: profileForm.address.trim(),
+      venue: profileForm.address.trim(),
+    };
+    setCurrentUser(updatedUser);
+    setProfileSavedSuccess(true);
+    if (auth?.showToast) {
+      auth.showToast('Profile details updated successfully!', 'success');
+    }
+    setTimeout(() => {
+      setProfileModalOpen(false);
+      setProfileSavedSuccess(false);
+    }, 1000);
+  };
+
   const [step1Errors, setStep1Errors] = useState({});
   const [step2Errors, setStep2Errors] = useState({});
   const [bookingData, setBookingData] = useState({
-    occasion: 'Birthday',
+    occasion: ['Birthday'],
     occasionOther: '',
     reels: {},
     name: '',
@@ -212,6 +257,20 @@ export default function HomePage() {
       setViewDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
       setTimeout(() => setIsTransitioningMonth(false), 80);
     }, 120);
+  };
+
+  const triggerDatePicker = (inputId) => {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    if (typeof input.showPicker === 'function') {
+      try {
+        input.showPicker();
+      } catch (err) {
+        input.click();
+      }
+    } else {
+      input.click();
+    }
   };
 
   useEffect(() => {
@@ -337,6 +396,17 @@ export default function HomePage() {
     setBookingStep(1);
     setStep1Errors({});
     setStep2Errors({});
+
+    const u = auth?.user || currentUser;
+    if (u) {
+      setBookingData((prev) => ({
+        ...prev,
+        name: u.name || `${u.firstName || ''} ${u.lastName || ''}`.trim() || prev.name,
+        email: u.email || prev.email,
+        phone: u.phone || u.mobile || prev.phone,
+      }));
+    }
+
     setModalOpen(true);
   };
   const closeModal = () => {
@@ -388,7 +458,7 @@ export default function HomePage() {
   };
   const selectDate = (date) => {
     setSelectedDate(date);
-    if (currentUser) {
+    if (currentUser || auth?.user) {
       setModalMode('booking');
       setBookingStep(1);
       setStep1Errors({});
@@ -559,11 +629,13 @@ export default function HomePage() {
   const handleConfirmBooking = async () => {
     if (!validateStep2()) return;
     const reelCount = Object.values(bookingData.reels).reduce((s, v) => s + (typeof v === 'number' ? v : 0), 0) || 1;
+    const occasionList = Array.isArray(bookingData.occasion) ? bookingData.occasion : [bookingData.occasion];
+    const occasionStr = occasionList.map(o => o === 'Other' ? bookingData.occasionOther.trim() || 'Other' : o).join(', ');
     const payload = {
       email: bookingData.email.trim(),
       name: bookingData.name.trim(),
       phone: bookingData.phone.trim(),
-      occasion: bookingData.occasion === 'Other' ? bookingData.occasionOther.trim() : bookingData.occasion,
+      occasion: occasionStr,
       bookingDate: selectedDate ? selectedDate.toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
       reels: bookingData.reels,
       reelCount,
@@ -596,12 +668,18 @@ export default function HomePage() {
           try {
             const loggedInUser = await auth.login(authEmailOrMobile.trim(), authPassword);
             setCurrentUser(loggedInUser);
-            // Role-based redirect: send administrators to the admin console.
+            // Role-based redirect: send administrators to admin console, editors to editor portal.
             if (loggedInUser?.role === 'ADMIN' || loggedInUser?.role === 'ROLE_ADMIN') {
-              localStorage.setItem('realyt_admin_token', loggedInUser.token);
+              localStorage.setItem('realyt_admin_token', loggedInUser.token || 'admin_token');
               localStorage.setItem('realyt_admin_user', JSON.stringify({ email: loggedInUser.email, role: loggedInUser.role }));
               if (auth?.showToast) auth.showToast('Admin authenticated! Redirecting to dashboard…', 'success');
               navigate('/app/admin/dashboard', { replace: true });
+              return;
+            }
+            if (loggedInUser?.role === 'EDITOR' || loggedInUser?.role === 'ROLE_EDITOR') {
+              localStorage.setItem('realyt_editor_user', JSON.stringify(loggedInUser));
+              if (auth?.showToast) auth.showToast('Editor authenticated! Redirecting to Editor Portal…', 'success');
+              navigate('/editor/dashboard', { replace: true });
               return;
             }
             if (authLaunch === 'booking') {
@@ -622,24 +700,39 @@ export default function HomePage() {
         if (!validateSignUpForm()) return;
         const fn = authFirstName.trim() || authEmail.trim().split('@')[0];
         const ln = authLastName.trim();
+        const registeredEmail = authEmail.trim();
         const newAccount = {
           firstName: fn,
           lastName: ln,
           name: `${fn} ${ln}`.trim(),
-          email: authEmail.trim(),
+          email: registeredEmail,
           mobile: authMobile.trim(),
+          role: authRole,
         };
         if (auth?.signup) {
           try {
-            const created = await auth.signup(authEmail.trim(), authPassword.trim(), newAccount);
-            if (created) {
-              setCurrentUser(created);
+            const res = await auth.signup(registeredEmail, authPassword.trim(), newAccount);
+            if (res) {
+              const userObj = {
+                name: newAccount.name,
+                email: registeredEmail,
+                mobile: newAccount.mobile,
+                role: authRole,
+              };
+              setCurrentUser(userObj);
+              if (authRole === 'EDITOR') {
+                localStorage.setItem('realyt_editor_user', JSON.stringify(userObj));
+                if (auth?.showToast) auth.showToast('Editor account created! Welcome to Editor Workspace.', 'success');
+                setModalOpen(false);
+                navigate('/editor/dashboard', { replace: true });
+                return;
+              }
               if (authLaunch === 'booking') {
-                continueToBooking(created);
+                continueToBooking(userObj);
               } else {
+                if (auth?.showToast) auth.showToast('Account created! Welcome to Realyt.', 'success');
                 setModalOpen(false);
               }
-              resetAuthState();
             }
             return;
           } catch (err) {
@@ -677,8 +770,13 @@ export default function HomePage() {
 
   const validateStep1 = () => {
     const errs = {};
-    if (bookingData.occasion === 'Other' && !bookingData.occasionOther.trim())
+    const list = Array.isArray(bookingData.occasion) ? bookingData.occasion : [bookingData.occasion];
+    if (list.length === 0) {
+      errs.occasion = 'Please select at least one occasion.';
+    }
+    if (list.includes('Other') && !bookingData.occasionOther.trim()) {
       errs.occasionOther = 'Please describe your occasion.';
+    }
     const reelCount = Object.values(bookingData.reels).reduce((s, v) => s + (typeof v === 'number' ? v : 0), 0);
     if (reelCount === 0 && !bookingData.reels.__otherChecked)
       errs.reels = 'Please select at least one reel type.';
@@ -723,7 +821,12 @@ export default function HomePage() {
           <div className="nav-cta">
             {(auth?.user || currentUser) ? (
               <div className="user-nav-badge">
-                <span className="user-badge-name">
+                <button
+                  type="button"
+                  className="user-badge-btn"
+                  onClick={openProfileModal}
+                  title="View & Edit Profile Details"
+                >
                   <span className="user-avatar-initial">
                     {(() => {
                       const u = auth?.user || currentUser;
@@ -731,11 +834,14 @@ export default function HomePage() {
                       return (typeof str === 'string' && str.length > 0) ? str[0].toUpperCase() : 'U';
                     })()}
                   </span>
-                  {(() => {
-                    const u = auth?.user || currentUser;
-                    return u?.firstName || u?.name || (u?.email ? u.email.split('@')[0] : 'User');
-                  })()}
-                </span>
+                  <span className="user-badge-name-text">
+                    {(() => {
+                      const u = auth?.user || currentUser;
+                      return u?.firstName || u?.name || (u?.email ? u.email.split('@')[0] : 'Profile');
+                    })()}
+                  </span>
+                  <span className="user-badge-edit-pill">Profile</span>
+                </button>
                 <button
                   className="btn btn-ghost btn-sm"
                   type="button"
@@ -807,9 +913,40 @@ export default function HomePage() {
                     </svg>
                   </button>
                 </div>
-                <div className="legend">
-                  <span><i className="dot open" /> Open</span>
-                  <span><i className="dot full" /> Fully booked</span>
+                <div className="lantern-actions-right">
+                  <div className="custom-date-picker-wrapper">
+                    <button
+                      type="button"
+                      className="custom-date-picker-btn"
+                      title="Pick any date from calendar"
+                      onClick={() => triggerDatePicker('customDatePickerInput')}
+                    >
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                        <line x1="16" y1="2" x2="16" y2="6" />
+                        <line x1="8" y1="2" x2="8" y2="6" />
+                        <line x1="3" y1="10" x2="21" y2="10" />
+                      </svg>
+                      <span>Pick Custom Date</span>
+                      <input
+                        id="customDatePickerInput"
+                        type="date"
+                        min={new Date().toISOString().slice(0, 10)}
+                        onChange={(e) => {
+                          if (!e.target.value) return;
+                          const [y, m, d] = e.target.value.split('-').map(Number);
+                          const pickedDate = new Date(y, m - 1, d);
+                          setViewDate(new Date(y, m - 1, 1));
+                          selectDate(pickedDate);
+                        }}
+                        className="custom-date-native-input"
+                      />
+                    </button>
+                  </div>
+                  <div className="legend">
+                    <span><i className="dot open" /> Open</span>
+                    <span><i className="dot full" /> Fully booked</span>
+                  </div>
                 </div>
               </div>
 
@@ -1039,7 +1176,7 @@ export default function HomePage() {
               <>
                 <div className="bk-header bk-header-signin">
                   <span className="bk-header-date">
-                    {authView === 'login' ? 'Welcome back' : authView === 'signup' ? "Let's get started" : 'Reset your password'}
+                    {authView === 'login' ? 'Account Login' : authView === 'signup' ? 'Create Account' : 'Reset Password'}
                   </span>
                   <button className="bk-close" type="button" aria-label="Close" onClick={closeModal}>✕</button>
                 </div>
@@ -1048,26 +1185,17 @@ export default function HomePage() {
 
                   {authStage === 'form' && authView === 'login' && (
                     <>
-                      <p className="bk-eyebrow">Log in</p>
-                      <h3 className="bk-title">Welcome back.</h3>
-                      <p className="bk-sub">Use your email or mobile number and password to access your account.</p>
+                      <h3 className="bk-title">Welcome back</h3>
+                      <p className="bk-sub">Enter your email and password to log in to Realyt.</p>
 
                       {authErrors.general && (
-                        <div className="bk-inline-error-banner" style={{
-                          background: 'rgba(239, 68, 68, 0.12)',
-                          border: '1px solid rgba(239, 68, 68, 0.35)',
-                          color: '#FCA5A5',
-                          padding: '10px 14px',
-                          borderRadius: '10px',
-                          fontSize: '0.88rem',
-                          marginBottom: '16px'
-                        }}>
+                        <div className="bk-inline-error-banner">
                           {authErrors.general}
                         </div>
                       )}
 
                       <div className="bk-field-group">
-                        <label className="bk-field-label" htmlFor="authEmailOrMobile">Email or mobile number</label>
+                        <label className="bk-field-label" htmlFor="authEmailOrMobile">Email or Mobile Number</label>
                         <input id="authEmailOrMobile" type="text" className={`bk-input ${authErrors.emailOrMobile ? 'bk-input-err' : ''}`} value={authEmailOrMobile}
                           onFocus={handleFieldFocus('authEmailOrMobile')}
                           onBlur={handleFieldBlur}
@@ -1077,46 +1205,35 @@ export default function HomePage() {
                       </div>
 
                       <div className="bk-field-group">
-                        <label className="bk-field-label" htmlFor="authPassword">Password</label>
+                        <div className="bk-field-header-row">
+                          <label className="bk-field-label" htmlFor="authPassword">Password</label>
+                          <button type="button" className="bk-forgot-link" onClick={() => { resetAuthState(); setAuthView('forgot'); setAuthStage('form'); }}>
+                            Forgot password?
+                          </button>
+                        </div>
                         <input id="authPassword" type="password" className={`bk-input ${authErrors.password ? 'bk-input-err' : ''}`} value={authPassword}
                           onFocus={handleFieldFocus('authPassword')}
                           onBlur={handleFieldBlur}
                           onChange={(e) => { setAuthPassword(e.target.value); setAuthErrors((c) => ({ ...c, password: '' })); }} placeholder="Enter your password" />
                         <FieldError msg={authErrors.password} />
-                        {renderFieldHelp('authPassword')}
                       </div>
 
-                      <div className="bk-forgot-row">
-                        <button type="button" className="bk-link-btn" onClick={() => { resetAuthState(); setAuthView('forgot'); setAuthStage('form'); }}>
-                          Forgot password?
+                      <div className="bk-auth-switch-prompt">
+                        <span>New to Realyt?</span>
+                        <button type="button" className="bk-auth-switch-btn" onClick={() => { resetAuthState(); setAuthView('signup'); setAuthStage('form'); }}>
+                          Create an account
                         </button>
                       </div>
-
-                      <p className="bk-inline-msg">
-                        New here?{' '}
-                        <button type="button" className="bk-link-btn" onClick={() => { resetAuthState(); setAuthView('signup'); setAuthStage('form'); }}>
-                          Sign up
-                        </button>
-                      </p>
                     </>
                   )}
 
                   {authStage === 'form' && authView === 'signup' && (
                     <>
-                      <p className="bk-eyebrow">Sign up</p>
-                      <h3 className="bk-title">Let's get your details</h3>
-                      <p className="bk-sub">Create your account and lock in your date.</p>
+                      <h3 className="bk-title">Create your account</h3>
+                      <p className="bk-sub">Fill in your details below to lock in your date.</p>
 
                       {authErrors.general && (
-                        <div className="bk-inline-error-banner" style={{
-                          background: 'rgba(239, 68, 68, 0.12)',
-                          border: '1px solid rgba(239, 68, 68, 0.35)',
-                          color: '#FCA5A5',
-                          padding: '10px 14px',
-                          borderRadius: '10px',
-                          fontSize: '0.88rem',
-                          marginBottom: '16px'
-                        }}>
+                        <div className="bk-inline-error-banner">
                           {authErrors.general}
                         </div>
                       )}
@@ -1153,6 +1270,20 @@ export default function HomePage() {
                       </div>
 
                       <div className="bk-field-group">
+                        <label className="bk-field-label" htmlFor="authRole">I want to join Realyt as</label>
+                        <select
+                          id="authRole"
+                          className="bk-input"
+                          value={authRole}
+                          onChange={(e) => setAuthRole(e.target.value)}
+                          style={{ background: '#FFFFFF', color: '#0F172A', fontWeight: 600, cursor: 'pointer' }}
+                        >
+                          <option value="CLIENT">👤 Client (Book Editors for Events & Celebrations)</option>
+                          <option value="EDITOR">🎬 Content Editor (Join Vetted Creator Circle)</option>
+                        </select>
+                      </div>
+
+                      <div className="bk-field-group">
                         <label className="bk-field-label" htmlFor="authMobile">Mobile number</label>
                         <input id="authMobile" type="tel" className={`bk-input ${authErrors.mobile ? 'bk-input-err' : ''}`} value={authMobile}
                           onFocus={handleFieldFocus('authMobile')}
@@ -1183,18 +1314,17 @@ export default function HomePage() {
                         </div>
                       </div>
 
-                      <p className="bk-inline-msg">
-                        Already have an account?{' '}
-                        <button type="button" className="bk-link-btn" onClick={() => { resetAuthState(); setAuthView('login'); setAuthStage('form'); }}>
+                      <div className="bk-auth-switch-prompt">
+                        <span>Already have an account?</span>
+                        <button type="button" className="bk-auth-switch-btn" onClick={() => { resetAuthState(); setAuthView('login'); setAuthStage('form'); }}>
                           Log in
                         </button>
-                      </p>
+                      </div>
                     </>
                   )}
 
                   {authStage === 'form' && authView === 'forgot' && (
                     <>
-                      <p className="bk-eyebrow">Forgot password</p>
                       <h3 className="bk-title">Reset your password</h3>
                       <p className="bk-sub">Enter your email or mobile number and choose a new password.</p>
 
@@ -1229,12 +1359,12 @@ export default function HomePage() {
                         </div>
                       </div>
 
-                      <p className="bk-inline-msg">
-                        Remembered it?{' '}
-                        <button type="button" className="bk-link-btn" onClick={() => { resetAuthState(); setAuthView('login'); setAuthStage('form'); }}>
+                      <div className="bk-auth-switch-prompt">
+                        <span>Remembered your password?</span>
+                        <button type="button" className="bk-auth-switch-btn" onClick={() => { resetAuthState(); setAuthView('login'); setAuthStage('form'); }}>
                           Log in
                         </button>
-                      </p>
+                      </div>
                     </>
                   )}
 
@@ -1286,6 +1416,28 @@ export default function HomePage() {
                     {selectedIsOpen ? '● Open slot' : '● Fully booked'}
                   </span>
                 )}
+                <button
+                  type="button"
+                  className="bk-change-date-btn"
+                  title="Choose a different date"
+                  onClick={() => triggerDatePicker('bkChangeDateInput')}
+                >
+                  <span>Change date</span>
+                  <input
+                    id="bkChangeDateInput"
+                    type="date"
+                    min={new Date().toISOString().slice(0, 10)}
+                    value={selectedDate ? selectedDate.toISOString().slice(0, 10) : ''}
+                    onChange={(e) => {
+                      if (!e.target.value) return;
+                      const [y, m, d] = e.target.value.split('-').map(Number);
+                      const pickedDate = new Date(y, m - 1, d);
+                      setViewDate(new Date(y, m - 1, 1));
+                      setSelectedDate(pickedDate);
+                    }}
+                    className="custom-date-native-input"
+                  />
+                </button>
               </div>
               <button className="bk-close" type="button" aria-label="Close" onClick={closeModal}>✕</button>
             </div>
@@ -1306,20 +1458,35 @@ export default function HomePage() {
                       <p className="bk-sub">Tell us about the day — we'll take it from there.</p>
 
                       <div className="bk-field-group">
-                        <p className="bk-field-label">What are you celebrating?</p>
+                        <p className="bk-field-label">What are you celebrating? <span style={{ textTransform: 'none', fontWeight: 400, opacity: 0.75 }}>(Select one or more)</span></p>
                         <div className="bk-chips">
-                          {occasions.map((occ) => (
-                            <button
-                              key={occ}
-                              type="button"
-                              className={`bk-chip ${bookingData.occasion === occ ? 'bk-chip-on' : ''}`}
-                              onClick={() => setBookingData((c) => ({ ...c, occasion: occ }))}
-                            >
-                              {occ}
-                            </button>
-                          ))}
+                          {occasions.map((occ) => {
+                            const selectedList = Array.isArray(bookingData.occasion) ? bookingData.occasion : [bookingData.occasion];
+                            const isSelected = selectedList.includes(occ);
+                            return (
+                              <button
+                                key={occ}
+                                type="button"
+                                className={`bk-chip ${isSelected ? 'bk-chip-on' : ''}`}
+                                onClick={() => {
+                                  let nextList;
+                                  if (isSelected) {
+                                    nextList = selectedList.filter((item) => item !== occ);
+                                    if (nextList.length === 0) nextList = [occ];
+                                  } else {
+                                    nextList = [...selectedList, occ];
+                                  }
+                                  setBookingData((c) => ({ ...c, occasion: nextList }));
+                                  setStep1Errors((c) => ({ ...c, occasion: '', occasionOther: '' }));
+                                }}
+                              >
+                                {occ}
+                                {isSelected && <span style={{ marginLeft: '6px', fontSize: '0.8rem', fontWeight: 700 }}>✓</span>}
+                              </button>
+                            );
+                          })}
                         </div>
-                        {bookingData.occasion === 'Other' && (
+                        {((Array.isArray(bookingData.occasion) && bookingData.occasion.includes('Other')) || bookingData.occasion === 'Other') && (
                           <input
                             type="text"
                             className={`bk-input ${step1Errors.occasionOther ? 'bk-input-err' : ''}`}
@@ -1329,6 +1496,7 @@ export default function HomePage() {
                             placeholder="Tell us what you're celebrating…"
                           />
                         )}
+                        <FieldError msg={step1Errors.occasion} />
                         <FieldError msg={step1Errors.occasionOther} />
                       </div>
 
@@ -1337,7 +1505,7 @@ export default function HomePage() {
                         <ReelBuilder
                           reels={bookingData.reels}
                           onChange={(r) => { setBookingData((c) => ({ ...c, reels: r })); setStep1Errors((c) => ({ ...c, reels: '', reelsOther: '' })); }}
-                          isWedding={bookingData.occasion === 'Wedding'}
+                          isWedding={Array.isArray(bookingData.occasion) ? bookingData.occasion.includes('Wedding') : bookingData.occasion === 'Wedding'}
                         />
                         <FieldError msg={step1Errors.reels} />
                         <FieldError msg={step1Errors.reelsOther} />
@@ -1360,6 +1528,24 @@ export default function HomePage() {
                       <p className="bk-eyebrow">Step 2 of 2</p>
                       <h3 className="bk-title">Reaching you</h3>
                       <p className="bk-sub">So we can confirm your slot and keep you in the loop.</p>
+
+                      {(auth?.user || currentUser) && (
+                        <div style={{
+                          background: 'rgba(242, 169, 59, 0.12)',
+                          border: '1px solid rgba(242, 169, 59, 0.35)',
+                          borderRadius: '12px',
+                          padding: '10px 14px',
+                          marginBottom: '18px',
+                          fontSize: '0.84rem',
+                          color: '#334155',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px'
+                        }}>
+                          <span style={{ fontSize: '1rem' }}>👤</span>
+                          <span>Prefilled from your account profile. You can edit any details below if you are booking for someone else.</span>
+                        </div>
+                      )}
 
                       <div className="bk-row-2">
                         <div className="bk-field-group">
@@ -1453,7 +1639,7 @@ export default function HomePage() {
                 </p>
                 <div className="bk-receipt">
                   <div className="bk-receipt-row"><span>Date</span><strong>{selectedLabel}</strong></div>
-                  <div className="bk-receipt-row"><span>Occasion</span><strong>{bookingData.occasion === 'Other' ? bookingData.occasionOther || 'Other' : bookingData.occasion}</strong></div>
+                  <div className="bk-receipt-row"><span>Occasion</span><strong>{Array.isArray(bookingData.occasion) ? bookingData.occasion.map(o => o === 'Other' ? bookingData.occasionOther || 'Other' : o).join(', ') : (bookingData.occasion === 'Other' ? bookingData.occasionOther || 'Other' : bookingData.occasion)}</strong></div>
                   <div className="bk-receipt-row"><span>Total Paid</span><strong>₹{liveTotalRupees.toLocaleString('en-IN')}</strong></div>
                   <div className="bk-receipt-row"><span>Status</span><strong style={{ color: '#34D399' }}>PAYMENT_RECEIVED</strong></div>
                 </div>
@@ -1598,6 +1784,101 @@ export default function HomePage() {
                 <button className="bk-submit" type="button" onClick={submitEditorApplication}>Send application</button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── USER PROFILE MODAL ── */}
+      {profileModalOpen && (
+        <div className="bk-overlay" onClick={() => setProfileModalOpen(false)}>
+          <div className="bk-sheet profile-sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="bk-header profile-header">
+              <div className="profile-header-left">
+                <div className="profile-avatar-large">
+                  {(() => {
+                    const u = auth?.user || currentUser;
+                    const str = u?.firstName || u?.name || u?.email || 'U';
+                    return (typeof str === 'string' && str.length > 0) ? str[0].toUpperCase() : 'U';
+                  })()}
+                </div>
+                <div>
+                  <h3 className="profile-header-name">
+                    {(auth?.user || currentUser)?.name || (auth?.user || currentUser)?.firstName || 'My Profile'}
+                  </h3>
+                  <p className="profile-header-email">{(auth?.user || currentUser)?.email}</p>
+                </div>
+              </div>
+              <button className="bk-close" type="button" aria-label="Close" onClick={() => setProfileModalOpen(false)}>✕</button>
+            </div>
+
+            <div className="bk-body profile-body">
+              {profileSavedSuccess ? (
+                <div className="bk-success" style={{ padding: '24px 0' }}>
+                  <div className="bk-check">
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+                      <path d="M4 12l5 5L20 6" stroke="white" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                  <h3 className="bk-success-title">Profile Saved</h3>
+                  <p className="bk-success-sub">Your personal details have been updated successfully.</p>
+                </div>
+              ) : (
+                <form onSubmit={handleSaveProfile} className="profile-form">
+                  <div className="bk-field-group">
+                    <label className="bk-field-label" htmlFor="pfName">Full Name</label>
+                    <input
+                      id="pfName"
+                      type="text"
+                      className="bk-input"
+                      value={profileForm.name}
+                      onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
+                      placeholder="Your full name"
+                      required
+                    />
+                  </div>
+
+                  <div className="bk-field-group">
+                    <label className="bk-field-label" htmlFor="pfEmail">Email Address</label>
+                    <input
+                      id="pfEmail"
+                      type="email"
+                      className="bk-input profile-input-disabled"
+                      value={profileForm.email}
+                      disabled
+                    />
+                    <span className="profile-field-note">Verified email linked to your account</span>
+                  </div>
+
+                  <div className="bk-field-group">
+                    <label className="bk-field-label" htmlFor="pfPhone">Phone / Mobile Number</label>
+                    <input
+                      id="pfPhone"
+                      type="tel"
+                      className="bk-input"
+                      value={profileForm.phone}
+                      onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
+                      placeholder="+91 98765 43210"
+                    />
+                  </div>
+
+                  <div className="bk-field-group">
+                    <label className="bk-field-label" htmlFor="pfAddress">City / Address</label>
+                    <input
+                      id="pfAddress"
+                      type="text"
+                      className="bk-input"
+                      value={profileForm.address}
+                      onChange={(e) => setProfileForm({ ...profileForm, address: e.target.value })}
+                      placeholder="e.g. Mumbai, Delhi, Jaipur"
+                    />
+                  </div>
+
+                  <div className="profile-modal-footer">
+                    <button className="bk-submit" type="submit">Save Changes</button>
+                  </div>
+                </form>
+              )}
+            </div>
           </div>
         </div>
       )}

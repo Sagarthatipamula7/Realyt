@@ -51,17 +51,10 @@ export function AuthProvider({ children }) {
     setAuthError(null);
     try {
       const displayName = extraData.name || extraData.fullName || (extraData.firstName ? `${extraData.firstName} ${extraData.lastName}`.trim() : null);
-      const data = await signupRequest(email, password, displayName);
-      const createdUser = {
-        email: data.email || email,
-        name: displayName || data.name || email.split('@')[0],
-        firstName: extraData.firstName || displayName || email.split('@')[0],
-        role: data.role || 'CLIENT',
-        token: data.token,
-      };
-      saveAuthData(createdUser);
-      showToast('Account created successfully!', 'success');
-      return { ...createdUser, created: true };
+      const userRole = extraData.role || 'CLIENT';
+      const data = await signupRequest(email, password, displayName, userRole);
+      showToast('Account created successfully! Please log in.', 'success');
+      return { success: true, email: data.email || email, role: data.role || userRole };
     } catch (error) {
       const msg = error.response?.data?.message || 'Signup failed. Please try again.';
       setAuthError(msg);

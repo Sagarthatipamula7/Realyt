@@ -15,7 +15,7 @@ export default function AdminPaymentsPage() {
   const handleRelease = async (orderId) => {
     await releasePayment(orderId);
     setPayments((prev) =>
-      prev.map((p) => (p.orderId === orderId ? { ...p, status: 'CAPTURED' } : p))
+      prev.map((p) => (p.orderId === orderId || p.id === orderId ? { ...p, status: 'CAPTURED' } : p))
     );
   };
 
@@ -44,7 +44,7 @@ export default function AdminPaymentsPage() {
 
   return (
     <div className="admin-page-container">
-      <AdminHeader title="Payments & Escrow Management" subtitle="Platform commission, editor payouts, and Stripe Connect transfers" />
+      <AdminHeader title="Payments & Escrow Management" subtitle="Platform commission, editor payouts, and Razorpay transfers" />
 
       {/* Summary Chips */}
       <div className="admin-grid-3 mb-24">
@@ -53,7 +53,7 @@ export default function AdminPaymentsPage() {
             <span className="card-title">Held in Escrow</span>
             <ShieldAlert className="text-marigold" size={20} />
           </div>
-          <div className="card-value">${totalHeld.toFixed(2)}</div>
+          <div className="card-value">₹{totalHeld.toLocaleString('en-IN')}</div>
           <span className="card-trend">Awaiting delivery verification</span>
         </div>
 
@@ -62,7 +62,7 @@ export default function AdminPaymentsPage() {
             <span className="card-title">This Month's Commission</span>
             <DollarSign className="text-teal" size={20} />
           </div>
-          <div className="card-value">${totalCommission.toFixed(2)}</div>
+          <div className="card-value">₹{totalCommission.toLocaleString('en-IN')}</div>
           <span className="card-trend text-teal">15% platform split</span>
         </div>
 
@@ -71,8 +71,8 @@ export default function AdminPaymentsPage() {
             <span className="card-title">Total Editor Payouts</span>
             <ArrowRightLeft className="text-rani" size={20} />
           </div>
-          <div className="card-value">${totalPayouts.toFixed(2)}</div>
-          <span className="card-trend">Transferred to Stripe accounts</span>
+          <div className="card-value">₹{totalPayouts.toLocaleString('en-IN')}</div>
+          <span className="card-trend">Transferred to connected accounts</span>
         </div>
       </div>
 
@@ -87,8 +87,8 @@ export default function AdminPaymentsPage() {
               <XAxis dataKey="month" stroke="#C9BCD6" />
               <YAxis stroke="#C9BCD6" />
               <Tooltip contentStyle={{ background: '#241832', border: '1px solid rgba(242,169,59,0.3)', borderRadius: '8px', color: '#F5EEE4' }} />
-              <Area type="monotone" dataKey="payouts" stroke="#E8437B" fill="rgba(232,67,123,0.15)" name="Editor Payouts ($)" />
-              <Area type="monotone" dataKey="commission" stroke="#2FA98C" fill="rgba(47,169,140,0.25)" name="Commission ($)" />
+              <Area type="monotone" dataKey="payouts" stroke="#E8437B" fill="rgba(232,67,123,0.15)" name="Editor Payouts (₹)" />
+              <Area type="monotone" dataKey="commission" stroke="#2FA98C" fill="rgba(47,169,140,0.25)" name="Commission (₹)" />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -104,6 +104,7 @@ export default function AdminPaymentsPage() {
         >
           <option value="ALL">All Payment Statuses</option>
           <option value="PENDING">Held / Pending</option>
+          <option value="HELD">Held in Escrow</option>
           <option value="CAPTURED">Released / Captured</option>
           <option value="REFUNDED">Refunded</option>
         </select>
@@ -134,15 +135,15 @@ export default function AdminPaymentsPage() {
                   <td><strong>#{pay.orderId || pay.id}</strong></td>
                   <td>{pay.client || 'Client'}</td>
                   <td>{pay.editor || 'Assigned Editor'}</td>
-                  <td><strong>${(Number(pay.amount) || 0).toFixed(2)}</strong></td>
-                  <td className="text-teal">${(Number(pay.commission) || 0).toFixed(2)}</td>
-                  <td className="text-marigold"><strong>${(Number(pay.editorPayout) || 0).toFixed(2)}</strong></td>
+                  <td><strong>₹{(Number(pay.amount) || 0).toLocaleString('en-IN')}</strong></td>
+                  <td className="text-teal">₹{(Number(pay.commission) || 0).toLocaleString('en-IN')}</td>
+                  <td className="text-marigold"><strong>₹{(Number(pay.editorPayout) || 0).toLocaleString('en-IN')}</strong></td>
                   <td>
                     <span className={`status-pill status-${statusStr.toLowerCase()}`}>
                       {statusStr}
                     </span>
                   </td>
-                  <td>{pay.date || pay.createdAt?.split('T')[0] || '2026-08-04'}</td>
+                  <td>{pay.date || pay.createdAt?.split('T')[0] || '2026-08-10'}</td>
                   <td>
                     {isHeld ? (
                       <button
@@ -150,7 +151,7 @@ export default function AdminPaymentsPage() {
                         className="btn btn-primary btn-sm"
                         onClick={() => handleRelease(pay.orderId || pay.id)}
                       >
-                        <CheckCircle2 size={13} /> Release Payment
+                        <CheckCircle2 size={13} /> Release Payout
                       </button>
                     ) : (
                       <span className="text-dim text-sm">Released</span>
